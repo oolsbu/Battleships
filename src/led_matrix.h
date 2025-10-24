@@ -14,7 +14,7 @@ extern CRGB leds[NUM_LEDS];  // just declare, define in main.cpp
 // Setup LEDs
 void ledSetup() {
   FastLED.addLeds<WS2812B, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS);
-  FastLED.setBrightness(1);
+  FastLED.setBrightness(10);
   FastLED.clear();
 }
 
