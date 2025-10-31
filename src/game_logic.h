@@ -106,7 +106,7 @@ inline bool collidesWithPlaced(const Boat &b) {
 }
 
 // Confirm placement: mark occupied cells and advance to next boat
-inline void confirmPlacement() {
+inline void confirmPlacement(bool finished) {
     if (currentIndex >= boatsCount) return;
     Boat &b = boats[currentIndex];
     if (collidesWithPlaced(b)) {
@@ -131,6 +131,9 @@ inline void confirmPlacement() {
         next.vertical = false;
         next.x = max(0, (WIDTH - next.size) / 2);
         next.y = HEIGHT / 2;
+    }
+    else{
+        finished = true;
     }
 }
 
@@ -174,8 +177,9 @@ inline void drawPlacementFrame(CRGB frame[WIDTH][HEIGHT]) {
 }
 
 // Move the currently placing boat by dx/dy
-inline void moveCurrentBoat(int dx, int dy) {
+inline void moveCurrentBoat(int dx, int dy, int button) {
     if (currentIndex >= boatsCount) return;
+    if(button != 0) return;
     Boat &b = boats[currentIndex];
     b.x += dx;
     b.y += dy;
@@ -217,10 +221,10 @@ inline bool allBoatsPlaced() {
 // dx,dy: joystick movement (-1/0/1)
 // button: current button state (1 when pressed)
 // frame: output frame to draw
-inline void placementStep(int dx, int dy, int button, CRGB frame[WIDTH][HEIGHT]) {
+inline void placementStep(int dx, int dy, int button, CRGB frame[WIDTH][HEIGHT], bool finished) {
     // Movement
     if (dx != 0 || dy != 0) {
-        moveCurrentBoat(dx, -dy); // joystick Y is inverted in readJoystick (up=1)
+        moveCurrentBoat(dx, dy, button); // joystick Y is not inverted in readJoystick (up=1)
     }
 
     // Button edge detection
@@ -234,7 +238,7 @@ inline void placementStep(int dx, int dy, int button, CRGB frame[WIDTH][HEIGHT])
         unsigned long dt = millis() - buttonPressTime;
         if (dt >= LONG_PRESS_MS) {
             // long press: confirm placement
-            confirmPlacement();
+            confirmPlacement(finished);
         } else {
             // short press: rotate
             rotateCurrentBoat();
@@ -245,4 +249,8 @@ inline void placementStep(int dx, int dy, int button, CRGB frame[WIDTH][HEIGHT])
 
     // draw
     drawPlacementFrame(frame);
+}
+
+inline void aim(int dx, int dy, int button, CRGB frame[WIDTH][HEIGHT]){
+
 }

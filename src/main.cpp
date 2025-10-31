@@ -6,11 +6,15 @@
 #include "joystick.h"
 #include "led_matrix.h"
 #include "game_logic.h"
+#include "player_logic.h"
 
 // UDP object (left in main so network helpers keep working)
 WiFiUDP udp;
+bool finished = false;
+bool myTurn = false;
 
 CRGB leds[NUM_LEDS]; // define once here
+CRGB frame[WIDTH][HEIGHT];
 
 void setup() {
     Serial.begin(9600);
@@ -41,8 +45,16 @@ void loop() {
     readJoystick(xInput, yInput, button);
 
     // Prepare frame and let game logic draw into it
-    CRGB frame[WIDTH][HEIGHT];
-    placementStep(xInput, yInput, button, frame);
+
+    if(!finished){
+        placementStep(xInput, yInput, button, frame, finished);
+    }
+    else if(myTurn){
+        aim(xInput, yInput, button, frame);
+    }
+    else{
+        myTurn = isMyTurn();
+    }
 
     // Show the frame
     showFrame(frame);
