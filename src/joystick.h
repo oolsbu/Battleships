@@ -8,10 +8,10 @@ inline void readJoystick(int& x, int& y, int& button) {
     button = 0;
     int valueX = analogRead(A0);  // Read X axis
     int valueY = analogRead(A1);  // Read Y axis
-    if(valueX < 400) x = -1;
-    if(valueX > 600 && valueX < 1000) x = 1;
+    if(valueX < 400) x = 1;
+    if(valueX > 600 && valueX < 850) x = -1;
     if(valueY < 400) y = 1;
     if(valueY > 600) y = -1;
-    if(valueX > 1000) button = 1;
+    if(valueX > 850) button = 1;
 
 }

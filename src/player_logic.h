@@ -1,12 +1,6 @@
-#include "udp_communication.h"
+// Small wrapper to access turn state from game logic
+#include "game_logic.h"
 
-
-bool isMyTurn(){
-    String message = receiveMessage();
-    if(message == "myTurn"){
-        return true;
-    }
-    else{
-        return false;
-    }
+inline bool isMyTurn() {
+    return getMyTurn();
 }

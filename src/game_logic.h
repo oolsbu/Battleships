@@ -7,6 +7,8 @@
 #include <FastLED.h>
 #include "led_matrix.h"
 #include "joystick.h"
+#include "udp_communication.h"
+#include "config.h"
 
 // Configuration limits
 #define MAX_BOAT_TYPES 6
@@ -31,11 +33,22 @@ static Boat boats[MAX_BOATS];
 static uint8_t boatsCount = 0;      // number of boats in the boats[] array
 static int currentIndex = 0;        // index of boat currently being placed
 static bool occupied[WIDTH][HEIGHT];
+// Track hits on our board (true if opponent hit this cell)
+static bool hitMap[WIDTH][HEIGHT];
+// Track results of our shots: 0=unknown, 1=miss, 2=hit
+static uint8_t opponentMap[WIDTH][HEIGHT];
 
 // Button press tracking for short vs long press
 static int prevButtonState = 0;
 static unsigned long buttonPressTime = 0;
 static const unsigned long LONG_PRESS_MS = 500; // >= 500ms to confirm placement
+// Timeout for showing opponent aim (ms)
+static const unsigned long OPP_AIM_TIMEOUT_MS = 1500;
+
+// Opponent aiming position (visible when SHOW_OPPONENT_AIM enabled)
+static int oppAimX = -1;
+static int oppAimY = -1;
+static unsigned long oppAimTime = 0;
 
 // Public: configure the boats to place
 // sizes[]: array of sizes
@@ -50,6 +63,13 @@ inline bool beginPlacement(const uint8_t sizes[], const uint8_t counts[], int ty
     for (int y = 0; y < HEIGHT; y++)
         for (int x = 0; x < WIDTH; x++)
             occupied[x][y] = false;
+    // reset hit and opponent maps
+    for (int y = 0; y < HEIGHT; y++) {
+        for (int x = 0; x < WIDTH; x++) {
+            hitMap[x][y] = false;
+            opponentMap[x][y] = 0;
+        }
+    }
 
     // expand sizes*counts into boats[]
     for (int t = 0; t < types; t++) {
@@ -105,8 +125,59 @@ inline bool collidesWithPlaced(const Boat &b) {
     return false;
 }
 
+// Find which boat (index) occupies a given cell, or -1
+inline int boatIndexAt(int x, int y) {
+    for (int i = 0; i < boatsCount; i++) {
+        Boat &b = boats[i];
+        if (!b.placed) continue;
+        if (!b.vertical) {
+            if (y == b.y && x >= b.x && x < b.x + b.size) return i;
+        } else {
+            if (x == b.x && y >= b.y && y < b.y + b.size) return i;
+        }
+    }
+    return -1;
+}
+
+// Check whether a boat is fully sunk (all its cells are hit)
+inline bool boatSunk(int index) {
+    if (index < 0 || index >= boatsCount) return false;
+    Boat &b = boats[index];
+    if (!b.placed) return false;
+    if (!b.vertical) {
+        for (int i = 0; i < b.size; i++) if (!hitMap[b.x + i][b.y]) return false;
+    } else {
+        for (int i = 0; i < b.size; i++) if (!hitMap[b.x][b.y + i]) return false;
+    }
+    return true;
+}
+
+// Mark an opponent boat as sunk in our opponentMap by expanding from a hit cell
+inline void markSunkOpponentBoat(int x, int y) {
+    if (x < 0 || y < 0) return;
+    // mark the central cell
+    opponentMap[x][y] = 3;
+    // check horizontal run of hits
+    int lx = x, rx = x;
+    while (lx - 1 >= 0 && opponentMap[lx - 1][y] == 2) lx--;
+    while (rx + 1 < WIDTH && opponentMap[rx + 1][y] == 2) rx++;
+    if (rx > lx) {
+        for (int xi = lx; xi <= rx; xi++) opponentMap[xi][y] = 3;
+        return;
+    }
+    // check vertical run
+    int ty = y, by = y;
+    while (ty - 1 >= 0 && opponentMap[x][ty - 1] == 2) ty--;
+    while (by + 1 < HEIGHT && opponentMap[x][by + 1] == 2) by++;
+    if (by > ty) {
+        for (int yi = ty; yi <= by; yi++) opponentMap[x][yi] = 3;
+        return;
+    }
+    // single cell boat - already marked
+}
+
 // Confirm placement: mark occupied cells and advance to next boat
-inline void confirmPlacement(bool finished) {
+inline void confirmPlacement(bool &finished) {
     if (currentIndex >= boatsCount) return;
     Boat &b = boats[currentIndex];
     if (collidesWithPlaced(b)) {
@@ -134,6 +205,7 @@ inline void confirmPlacement(bool finished) {
     }
     else{
         finished = true;
+        Serial.println(finished);
     }
 }
 
@@ -221,7 +293,7 @@ inline bool allBoatsPlaced() {
 // dx,dy: joystick movement (-1/0/1)
 // button: current button state (1 when pressed)
 // frame: output frame to draw
-inline void placementStep(int dx, int dy, int button, CRGB frame[WIDTH][HEIGHT], bool finished) {
+inline void placementStep(int dx, int dy, int button, CRGB frame[WIDTH][HEIGHT], bool &finished) {
     // Movement
     if (dx != 0 || dy != 0) {
         moveCurrentBoat(dx, dy, button); // joystick Y is not inverted in readJoystick (up=1)
@@ -251,6 +323,155 @@ inline void placementStep(int dx, int dy, int button, CRGB frame[WIDTH][HEIGHT],
     drawPlacementFrame(frame);
 }
 
-inline void aim(int dx, int dy, int button, CRGB frame[WIDTH][HEIGHT]){
+// Current aiming position and game state
+static int aimX = WIDTH/2;
+static int aimY = HEIGHT/2;
+static bool myTurn = true;  // Start with our turn
+// AIM send rate limiting
+static unsigned long lastAimSendTime = 0;
+static const unsigned long AIM_SEND_INTERVAL_MS = 150; // ms
 
+// Accessors so other modules (e.g., player_logic) can read/modify turn state
+inline bool getMyTurn() { return myTurn; }
+inline void setMyTurn(bool v) { myTurn = v; }
+
+inline void aim(int dx, int dy, int button, CRGB frame[WIDTH][HEIGHT]){
+    // Clear frame
+    for (int y = 0; y < HEIGHT; y++)
+        for (int x = 0; x < WIDTH; x++)
+            frame[x][y] = CRGB::Black;
+
+    // Process a single incoming message (non-blocking)
+    String msg = receiveMessage();
+    if (msg.length() > 0) {
+        // AIM messages: opponent sharing their current aim
+        if (msg.startsWith("AIM:")) {
+            int comma = msg.indexOf(',');
+            if (comma > 4) {
+                int x = msg.substring(4, comma).toInt();
+                int y = msg.substring(comma + 1).toInt();
+                if (x >= 0 && x < WIDTH && y >= 0 && y < HEIGHT) {
+                    oppAimX = x; oppAimY = y; oppAimTime = millis();
+                }
+            }
+        }
+        // SHOT messages: opponent fired at us
+        else if (msg.startsWith("SHOT:")) {
+            int comma = msg.indexOf(',');
+            if (comma > 5) {
+                int sx = msg.substring(5, comma).toInt();
+                int sy = msg.substring(comma + 1).toInt();
+                if (sx >= 0 && sx < WIDTH && sy >= 0 && sy < HEIGHT) {
+                    bool wasHit = false;
+                    if (occupied[sx][sy]) {
+                        // mark as hit
+                        hitMap[sx][sy] = true;
+                        wasHit = true;
+                    }
+
+                    // Determine sink
+                    int bidx = boatIndexAt(sx, sy);
+                    bool sunk = (bidx >= 0) && boatSunk(bidx);
+
+                    // Reply with result
+                    char reply[32];
+                    if (wasHit) {
+                        if (sunk) snprintf(reply, sizeof(reply), "RESULT:SINK");
+                        else snprintf(reply, sizeof(reply), "RESULT:HIT");
+                    } else {
+                        snprintf(reply, sizeof(reply), "RESULT:MISS");
+                    }
+                    sendMessage(reply);
+                }
+            }
+        }
+        // RESULT messages: reply to our shot
+        else if (msg.startsWith("RESULT:")) {
+            String tok = msg.substring(7);
+            if (tok.startsWith("HIT")) {
+                // record last aimed cell as hit
+                if (aimX >= 0 && aimY >= 0) opponentMap[aimX][aimY] = 2;
+                myTurn = true; // our shot resolved, back to our turn
+            } else if (tok.startsWith("MISS")) {
+                if (aimX >= 0 && aimY >= 0) opponentMap[aimX][aimY] = 1;
+                myTurn = true;
+            } else if (tok.startsWith("SINK")) {
+                if (aimX >= 0 && aimY >= 0) {
+                    opponentMap[aimX][aimY] = 2; // mark as hit first
+                    // convert contiguous hit run to sunk markers
+                    markSunkOpponentBoat(aimX, aimY);
+                }
+                myTurn = true;
+            }
+        }
+    }
+
+    if (myTurn) {
+        // Move aim position with joystick if it's our turn
+        bool moved = false;
+        if (dx != 0 || dy != 0) {
+            aimX += dx;
+            aimY += dy;
+            moved = true;
+            // Clamp to valid coordinates
+            if (aimX < 0) aimX = 0;
+            if (aimY < 0) aimY = 0;
+            if (aimX >= WIDTH) aimX = WIDTH - 1;
+            if (aimY >= HEIGHT) aimY = HEIGHT - 1;
+        }
+
+        // If configured, share our aim with opponent when moving
+#if SHOW_OPPONENT_AIM
+        if (moved && (millis() - lastAimSendTime) >= AIM_SEND_INTERVAL_MS) {
+            char am[32];
+            snprintf(am, sizeof(am), "AIM:%d,%d", aimX, aimY);
+            sendMessage(am);
+            lastAimSendTime = millis();
+        }
+#endif
+
+        // Draw previous shot results (miss/hit/sunk)
+        for (int y = 0; y < HEIGHT; y++) {
+            for (int x = 0; x < WIDTH; x++) {
+                if (opponentMap[x][y] == 1) frame[x][y] = CRGB::Blue; // miss
+                else if (opponentMap[x][y] == 2) frame[x][y] = CRGB::Red; // hit
+                else if (opponentMap[x][y] == 3) frame[x][y] = CRGB::Purple; // sunk
+            }
+        }
+
+        // Draw aiming crosshair
+        frame[aimX][aimY] = CRGB::Yellow;
+
+        // When button is pressed (edge detection handled in joystick code's caller), shoot at current position
+        if (button == 1) {
+            // Send shot coordinates
+            char message[32];
+            snprintf(message, sizeof(message), "SHOT:%d,%d", aimX, aimY);
+            Serial.println(message);
+            sendMessage(message);
+
+            // Set turn to false and wait for response
+            myTurn = false;
+        }
+    }
+    else {
+        // If it's not our turn, show waiting indicator and optionally opponent aim
+        frame[0][0] = CRGB::Blue;
+
+#if SHOW_OPPONENT_AIM
+        if (oppAimX >= 0 && oppAimY >= 0 && (millis() - oppAimTime) < OPP_AIM_TIMEOUT_MS) {
+            frame[oppAimX][oppAimY] = CRGB::Yellow;
+        }
+#endif
+        // Also draw hits that opponent made on our board (highlight sunk boats)
+        for (int y = 0; y < HEIGHT; y++) {
+            for (int x = 0; x < WIDTH; x++) {
+                if (hitMap[x][y]) {
+                    int bidx = boatIndexAt(x, y);
+                    if (bidx >= 0 && boatSunk(bidx)) frame[x][y] = CRGB::Purple;
+                    else frame[x][y] = CRGB::Red;
+                }
+            }
+        }
+    }
 }

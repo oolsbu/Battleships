@@ -11,7 +11,6 @@
 // UDP object (left in main so network helpers keep working)
 WiFiUDP udp;
 bool finished = false;
-bool myTurn = false;
 
 CRGB leds[NUM_LEDS]; // define once here
 CRGB frame[WIDTH][HEIGHT];
@@ -49,11 +48,10 @@ void loop() {
     if(!finished){
         placementStep(xInput, yInput, button, frame, finished);
     }
-    else if(myTurn){
+    else {
+        // Always call aim so incoming messages (AIM/SHOT/RESULT) are processed
+        // internally; `aim` will draw appropriate frame depending on `myTurn`.
         aim(xInput, yInput, button, frame);
-    }
-    else{
-        myTurn = isMyTurn();
     }
 
     // Show the frame

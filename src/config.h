@@ -15,4 +15,8 @@ const unsigned int LOCAL_PORT = 8888;
 const unsigned int OTHER_PORT = 8888;
 const IPAddress OTHER_IP(192,168,0,181);
 
+// Toggle: when enabled (1) the waiting player will see where the opponent is
+// currently aiming (sent as AIM:x,y packets). Set to 0 to disable.
+#define SHOW_OPPONENT_AIM 1
+
 #endif
