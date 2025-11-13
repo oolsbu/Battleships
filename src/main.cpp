@@ -7,6 +7,7 @@
 #include "led_matrix.h"
 #include "game_logic.h"
 #include "player_logic.h"
+#include "credentials.h"
 
 // UDP object (left in main so network helpers keep working)
 WiFiUDP udp;
@@ -29,6 +30,7 @@ void setup() {
     // Connect WiFi (optional for placement, kept from original project)
     const char* ssid = WIFI_SSID;
     const char* password = WIFI_PASSWORD;
+    
     if (!connectWiFi(ssid, password, 20000)) {
         Serial.println("Failed to connect to WiFi - continuing without network");
     } else {
