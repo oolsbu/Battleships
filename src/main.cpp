@@ -35,8 +35,6 @@ void setup() {
         Serial.println("Failed to connect to WiFi - continuing without network");
     } else {
         startUDP(LOCAL_PORT);
-        sendMessage("hello");
-        Serial.println("UDP test message sent.");
     }
 }
 
