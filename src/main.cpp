@@ -47,11 +47,40 @@ void loop() {
 
     if(!finished){
         placementStep(xInput, yInput, button, frame, finished);
+        // Handle state transition when placement finishes
+        static bool placementWasNotFinished = true;
+        if (placementWasNotFinished && finished) {
+            Serial.println("\n========================================");
+            Serial.println("[PLACEMENT] Boat placement COMPLETE!");
+            Serial.println("[PLACEMENT] Waiting for opponent...");
+            Serial.println("========================================\n");
+            notifyReadyToOpponent();
+            readyState = READY_WAITING_FOR_OPPONENT;
+            placementFinishedTime = millis();
+            placementWasNotFinished = false;
+        }
     }
     else {
-        // Always call aim so incoming messages (AIM/SHOT/RESULT) are processed
-        // internally; `aim` will draw appropriate frame depending on `myTurn`.
-        aim(xInput, yInput, button, frame);
+        // Game phase: handle ready handshake and then gameplay
+        handleReadyHandshake();
+        
+        // Only allow aim/shooting if both players are synced
+        if (readyState == READY_SYNCED) {
+            // Both players ready - run normal gameplay
+            aim(xInput, yInput, button, frame);
+        } else {
+            // Still waiting for opponent to finish placement - show waiting screen
+            for (int y = 0; y < HEIGHT; y++)
+                for (int x = 0; x < WIDTH; x++)
+                    frame[x][y] = CRGB::Black;
+            frame[0][0] = CRGB::Blue;  // Show a blue pixel indicating waiting
+            // Periodic debug output
+            static unsigned long lastPrint = 0;
+            if ((millis() - lastPrint) > 1000) {
+                Serial.println("[SYNC] Waiting for opponent to finish placement...");
+                lastPrint = millis();
+            }
+        }
     }
 
     // Show the frame

@@ -15,7 +15,7 @@ static const CRGB COLOR_MISS = CRGB::Blue;
 static const CRGB COLOR_HIT = CRGB::Red;
 static const CRGB COLOR_SUNK = CRGB::Purple;
 static const CRGB COLOR_AIM = CRGB::Yellow;
-static const CRGB COLOR_WAITING = CRGB::Blue;
+static const CRGB COLOR_WAITING = CRGB::Orange;
 
 static const unsigned long LONG_PRESS_MS = 500;
 static const unsigned long AIM_SEND_INTERVAL_MS = 150;
@@ -278,21 +278,33 @@ inline void handleReadyHandshake() {
     } else if (readyState == READY_WAITING_FOR_OPPONENT) {
         // We're done placing, waiting for opponent
         if (opponentPlacementTimeReceived) {
-            // Both sides have placement timestamps; compare to determine who finished first
+            // Both sides have placement timestamps; determine who shoots first
             Serial.println("[READY] Both timestamps available - deciding who shoots first...");
             const unsigned long MAX_UL = 0xFFFFFFFFUL;
             unsigned long myTime = placementFinishedTime ? placementFinishedTime : MAX_UL;
             unsigned long theirTime = opponentPlacementTime ? opponentPlacementTime : MAX_UL;
             Serial.print("[READY] myTime="); Serial.print(myTime);
             Serial.print(" theirTime="); Serial.println(theirTime);
-            if (myTime <= theirTime) {
-                // We finished earlier (or tie) -> we shoot first
+            
+#if RANDOM_FIRST_SHOOTER
+            // Random selection: use timestamp as seed and roll dice
+            randomSeed(myTime ^ theirTime);
+            bool iShootFirst = (random(0, 2) == 0);
+            Serial.print("[READY] Random selection: ");
+            Serial.println(iShootFirst ? "YOU SHOOT FIRST" : "OPPONENT SHOOTS FIRST");
+#else
+            // Deterministic: who finished placement first shoots first
+            bool iShootFirst = (myTime <= theirTime);
+            Serial.print("[READY] Deterministic selection (timestamp-based): ");
+            Serial.println(iShootFirst ? "YOU FINISHED FIRST - YOU SHOOT FIRST" : "OPPONENT FINISHED FIRST - YOU WAIT FIRST");
+#endif
+            
+            if (iShootFirst) {
                 gamePhase = PHASE_MY_TURN;
-                Serial.println("[READY] >>> YOU FINISHED FIRST - YOU SHOOT FIRST! <<<");
+                Serial.println("[READY] >>> YOU SHOOT FIRST! <<<");
             } else {
-                // Opponent finished earlier -> they shoot first
                 gamePhase = PHASE_WAIT_FOR_OPPONENT;
-                Serial.println("[READY] >>> OPPONENT FINISHED FIRST - YOU WAIT FIRST <<<");
+                Serial.println("[READY] >>> OPPONENT SHOOTS FIRST - YOU WAIT FIRST <<<");
             }
             readyState = READY_SYNCED;
             readyStateStartTime = now;
@@ -469,17 +481,43 @@ inline void aim(int dx, int dy, int button, CRGB frame[WIDTH][HEIGHT]) {
                 else if (opponentMap[x][y] == 3) frame[x][y] = COLOR_SUNK;
     }
     else if (gamePhase == PHASE_WAIT_FOR_OPPONENT) {
-        // Display your board while waiting for opponent
+        // Display your board while waiting for opponent to shoot
+        // Show all placed boats (green if unhit, red if hit) so player can see if opponent is close
         frame[0][0] = COLOR_WAITING;
 #if SHOW_OPPONENT_AIM
         if (oppAimX >= 0 && oppAimY >= 0 && (millis() - oppAimTime) < OPP_AIM_TIMEOUT_MS)
-            frame[oppAimX][oppAimY] = COLOR_AIM;
+            frame[oppAimX][oppAimY] = COLOR_AIM;  // Show opponent's cursor
 #endif
-        for (int y = 0; y < HEIGHT; y++)
-            for (int x = 0; x < WIDTH; x++)
-                if (hitMap[x][y]) {
-                    int boatIdx = boatIndexAt(x, y);
-                    frame[x][y] = (boatIdx >= 0 && boatSunk(boatIdx)) ? COLOR_SUNK : COLOR_HIT;
+        // Draw all placed boats
+        for (int i = 0; i < boatsCount; i++) {
+            if (!boats[i].placed) continue;
+            Boat &b = boats[i];
+            if (!b.vertical) {
+                for (int cell = 0; cell < b.size; cell++) {
+                    int px = b.x + cell, py = b.y;
+                    if (px >= 0 && px < WIDTH && py >= 0 && py < HEIGHT) {
+                        // Show red if hit, green if unhit
+                        if (hitMap[px][py]) {
+                            int boatIdx = boatIndexAt(px, py);
+                            frame[px][py] = (boatIdx >= 0 && boatSunk(boatIdx)) ? COLOR_SUNK : COLOR_HIT;
+                        } else {
+                            frame[px][py] = COLOR_PLACED;  // Green for unhit boat
+                        }
+                    }
                 }
+            } else {
+                for (int cell = 0; cell < b.size; cell++) {
+                    int px = b.x, py = b.y + cell;
+                    if (px >= 0 && px < WIDTH && py >= 0 && py < HEIGHT) {
+                        if (hitMap[px][py]) {
+                            int boatIdx = boatIndexAt(px, py);
+                            frame[px][py] = (boatIdx >= 0 && boatSunk(boatIdx)) ? COLOR_SUNK : COLOR_HIT;
+                        } else {
+                            frame[px][py] = COLOR_PLACED;  // Green for unhit boat
+                        }
+                    }
+                }
+            }
+        }
     }
 }

@@ -19,4 +19,8 @@ const IPAddress OTHER_IP(172,20,10,4);
 // currently aiming (sent as AIM:x,y packets). Set to 0 to disable.
 #define SHOW_OPPONENT_AIM 1
 
+// Toggle: when enabled (1), the first shooter is chosen randomly after both players
+// are ready. When disabled (0), the player who finished placement first shoots first.
+#define RANDOM_FIRST_SHOOTER 0
+
 #endif
