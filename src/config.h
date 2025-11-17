@@ -23,4 +23,17 @@ const IPAddress OTHER_IP(172,20,10,4);
 // are ready. When disabled (0), the player who finished placement first shoots first.
 #define RANDOM_FIRST_SHOOTER 0
 
+// Board size: playable area (must be between 8 and 14)
+// The board will be centered on the 16x16 LED grid with a border
+#define BOARD_SIZE 10
+
+// Validate board size at compile time
+#if BOARD_SIZE < 8 || BOARD_SIZE > 14
+#error "BOARD_SIZE must be between 8 and 14"
+#endif
+
+// Calculate centered board offsets
+#define BOARD_OFFSET_X ((16 - BOARD_SIZE) / 2)
+#define BOARD_OFFSET_Y ((16 - BOARD_SIZE) / 2)
+
 #endif
