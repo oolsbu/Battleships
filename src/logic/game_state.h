@@ -13,7 +13,7 @@ static const CRGB COLOR_INVALID = CRGB::Red;
 static const CRGB COLOR_MISS = CRGB::Blue;
 static const CRGB COLOR_HIT = CRGB::Red;
 static const CRGB COLOR_SUNK = CRGB::Purple;
-static const CRGB COLOR_AIM = CRGB::Yellow;
+static const CRGB COLOR_AIM = CRGB::Red;
 static const CRGB COLOR_WAITING = CRGB::Orange;
 static const CRGB COLOR_BORDER = CRGB::White;
 
@@ -22,7 +22,7 @@ static const unsigned long LONG_PRESS_MS = 500;
 static const unsigned long AIM_SEND_INTERVAL_MS = 150;
 static const unsigned long OPP_AIM_TIMEOUT_MS = 1500;
 static const unsigned long READY_HANDSHAKE_TIMEOUT_MS = 10000;
-static const unsigned long RESULT_DISPLAY_TIME_MS = 1000;
+static const unsigned long RESULT_DISPLAY_TIME_MS = 2000;  // Increased from 1000 to smooth transitions
 
 // ===== Boat Structure =====
 struct Boat {
@@ -65,6 +65,7 @@ static int aimY = BOARD_SIZE / 2;
 static unsigned long lastAimSendTime = 0;
 static int oppAimX = -1, oppAimY = -1;
 static unsigned long oppAimTime = 0;
+static int lastShotX = -1, lastShotY = -1;  // Track the last shot fired to show opponent board after firing
 
 // ===== Phase Management =====
 static GamePhase gamePhase = PHASE_MY_TURN;

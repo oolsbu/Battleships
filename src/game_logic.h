@@ -43,6 +43,21 @@ inline void aim(int dx, int dy, int button, CRGB frame[16][16]) {
         if (msg.length() > 0) {
             Serial.print("[AIM] Received message: ");
             Serial.println(msg);
+            
+            // Ignore stale READY messages during gameplay (game already synced)
+            if (msg.startsWith("READY:") || msg.startsWith("READY")) {
+                Serial.println("[AIM] Ignoring stale READY message during gameplay");
+                continue;
+            }
+            
+            // Handle LOST message from opponent
+            if (msg.startsWith("LOST")) {
+                Serial.println("[GAME] Opponent sent LOST message - they acknowledge our victory");
+                continue;
+            }
+            
+            // Any valid game message is a heartbeat indicating opponent is present
+            opponentReady = true;
 
             if (msg.startsWith("AIM:")) {
                 int comma = msg.indexOf(',');
@@ -105,6 +120,9 @@ inline void aim(int dx, int dy, int button, CRGB frame[16][16]) {
                         markSunkOpponentBoat(aimX, aimY);
                     }
                 }
+                // Clear the last shot marker so we'll show our board after result display
+                lastShotX = -1;
+                lastShotY = -1;
                 Serial.println("[AIM] >>> Transitioning to PHASE_SHOW_RESULT");
                 gamePhase = PHASE_SHOW_RESULT;
                 phaseStartTime = millis();
@@ -114,6 +132,25 @@ inline void aim(int dx, int dy, int button, CRGB frame[16][16]) {
 
     // Update phase transitions
     updatePhaseTransitions();
+
+    // Check for game-end conditions
+    if (!gameEnded) {
+        if (allOpponentBoatsSunk()) {
+            Serial.println("[GAME] >>> YOU WIN! All opponent boats sunk!");
+            gameEnded = true;
+            playerWon = true;
+            gamePhase = PHASE_GAME_WON;
+            phaseStartTime = millis();
+            // Notify opponent they lost
+            sendMessage("LOST");
+        } else if (allyBoatsAllSunk()) {
+            Serial.println("[GAME] >>> YOU LOSE! All your boats have been sunk!");
+            gameEnded = true;
+            playerWon = false;
+            gamePhase = PHASE_GAME_LOST;
+            phaseStartTime = millis();
+        }
+    }
 
     // Handle aiming input and drawing
     if (gamePhase == PHASE_MY_TURN) {
@@ -136,13 +173,23 @@ inline void aim(int dx, int dy, int button, CRGB frame[16][16]) {
 #endif
         
         if (button == 1) {
-            char shotMsg[32];
-            snprintf(shotMsg, sizeof(shotMsg), "SHOT:%d,%d", aimX, aimY);
-            Serial.print("[SHOOT] FIRING at ");
-            Serial.println(shotMsg);
-            sendMessage(shotMsg);
-            Serial.println("[SHOOT] >>> Transitioning to PHASE_WAIT_FOR_OPPONENT");
-            gamePhase = PHASE_WAIT_FOR_OPPONENT;
+            // Check if this square has already been shot
+            if (shotAlreadyFired(aimX, aimY)) {
+                Serial.println("[SHOOT] Square already shot! Ignoring duplicate shot.");
+            } else {
+                char shotMsg[32];
+                snprintf(shotMsg, sizeof(shotMsg), "SHOT:%d,%d", aimX, aimY);
+                Serial.print("[SHOOT] FIRING at ");
+                Serial.println(shotMsg);
+                sendMessage(shotMsg);
+                // Mark as pending (set to 1 = MISS by default, will be updated by result)
+                opponentMap[aimX][aimY] = 1;
+                // Track this shot so we keep showing opponent board while waiting for result
+                lastShotX = aimX;
+                lastShotY = aimY;
+                Serial.println("[SHOOT] >>> Transitioning to PHASE_WAIT_FOR_OPPONENT");
+                gamePhase = PHASE_WAIT_FOR_OPPONENT;
+            }
         }
         
         drawMyTurnFrame(frame);
@@ -155,5 +202,11 @@ inline void aim(int dx, int dy, int button, CRGB frame[16][16]) {
     }
     else if (gamePhase == PHASE_WAIT_FOR_OPPONENT) {
         drawWaitForOpponentFrame(frame);
+    }
+    else if (gamePhase == PHASE_GAME_WON) {
+        drawGameWonFrame(frame);
+    }
+    else if (gamePhase == PHASE_GAME_LOST) {
+        drawGameLostFrame(frame);
     }
 }

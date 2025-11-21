@@ -82,12 +82,8 @@ inline void handleReadyHandshake() {
             gamePhase = PHASE_MY_TURN;
         }
     } else if (readyState == READY_SYNCED) {
-        // Game has started
-        if (!opponentReady && (now - readyStateStartTime) > 5000) {
-            Serial.println("[READY] WARNING: Opponent became unready during game");
-            // Avoid spamming the log: only warn once per interval
-            readyStateStartTime = now;
-        }
+        // Game has started - no action needed here
+        // Opponent presence is tracked by receiving game messages (heartbeat mechanism)
     }
 }
 

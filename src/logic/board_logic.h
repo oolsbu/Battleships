@@ -86,3 +86,48 @@ inline void clampAim(int &x, int &y) {
     if (y < 0) y = 0;
     if (y >= BOARD_SIZE) y = BOARD_SIZE - 1;
 }
+
+inline bool allOpponentBoatsSunk() {
+    // Check if all of the opponent's boats are sunk.
+    // Count cells marked as sunk (value 3) and compare to total boat cells.
+    // Total calculated dynamically from config: sum of (size[i] * count[i])
+    
+    // Calculate total boat cells from config
+    int totalBoatCells = 0;
+    for (int i = 0; i < types; i++) {
+        totalBoatCells += sizes[i] * counts[i];
+    }
+    
+    int sunkCellCount = 0;
+    for (int y = 0; y < BOARD_SIZE; y++) {
+        for (int x = 0; x < BOARD_SIZE; x++) {
+            if (opponentMap[x][y] == 3) {
+                sunkCellCount++;
+            }
+        }
+    }
+    
+    return (sunkCellCount == totalBoatCells);
+}
+
+inline bool allyBoatsAllSunk() {
+    // Check if all of our boats have been sunk (all cells in boats are in hitMap)
+    for (int i = 0; i < boatsCount; i++) {
+        if (!boats[i].placed) continue;
+        if (!boatSunk(i)) return false;
+    }
+    // Verify we have at least one placed boat
+    bool hasBoats = false;
+    for (int i = 0; i < boatsCount; i++) {
+        if (boats[i].placed) {
+            hasBoats = true;
+            break;
+        }
+    }
+    return hasBoats;
+}
+
+inline bool shotAlreadyFired(int x, int y) {
+    // Check if this square has already been shot at (opponentMap is not 0)
+    return (opponentMap[x][y] != 0);
+}
