@@ -4,15 +4,22 @@
 // ===== Helper: Draw Border =====
 
 inline void drawBorder(CRGB frame[16][16]) {
-    // Draw white border around the play area
-    for (int x = 0; x < 16; x++) {
-        for (int y = 0; y < 16; y++) {
-            // Check if on border
-            if (x < BOARD_OFFSET_X || x >= BOARD_OFFSET_X + BOARD_SIZE ||
-                y < BOARD_OFFSET_Y || y >= BOARD_OFFSET_Y + BOARD_SIZE) {
-                frame[x][y] = COLOR_BORDER;
-            }
-        }
+    // Draw a 1-pixel wide border around the play area (leave interior/background untouched)
+    int left = BOARD_OFFSET_X - 1;
+    int right = BOARD_OFFSET_X + BOARD_SIZE;
+    int top = BOARD_OFFSET_Y - 1;
+    int bottom = BOARD_OFFSET_Y + BOARD_SIZE;
+
+    // Top and bottom horizontal lines
+    for (int x = left; x <= right; x++) {
+        frame[x][top] = COLOR_BORDER;
+        frame[x][bottom] = COLOR_BORDER;
+    }
+
+    // Left and right vertical lines
+    for (int y = top; y <= bottom; y++) {
+        frame[left][y] = COLOR_BORDER;
+        frame[right][y] = COLOR_BORDER;
     }
 }
 

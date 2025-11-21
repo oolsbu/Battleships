@@ -6,26 +6,35 @@
 
 inline void handleReadyHandshake() {
     // Handle the ready state machine for synchronizing game start
-    String msg = receiveMessage();
+    // Only process messages if we haven't synced yet; once READY_SYNCED,
+    // all incoming messages should go directly to the game loop (aim function).
     unsigned long now = millis();
     
-    if (msg.length() > 0) {
-        if (msg.startsWith("READY:")) {
-            // Expect format: READY:<placementMillis>
-            unsigned long otherTime = (unsigned long) msg.substring(6).toInt();
-            Serial.print("[READY] Received opponent READY timestamp: ");
-            Serial.println(otherTime);
-            opponentReady = true;
-            opponentPlacementTime = otherTime;
-            opponentPlacementTimeReceived = true;
-            readyStateStartTime = now;
-        } else if (msg.startsWith("READY")) {
-            // Backwards-compatible: treat plain READY as timestamp 0
-            Serial.println("[READY] Received opponent READY (no timestamp)");
-            opponentReady = true;
-            opponentPlacementTime = 0;
-            opponentPlacementTimeReceived = true;
-            readyStateStartTime = now;
+    if (readyState != READY_SYNCED) {
+        String msg = receiveMessage();
+        if (msg.length() > 0) {
+            if (msg.startsWith("READY:")) {
+                // Expect format: READY:<placementMillis>
+                unsigned long otherTime = (unsigned long) msg.substring(6).toInt();
+                Serial.print("[READY] Received opponent READY timestamp: ");
+                Serial.println(otherTime);
+                opponentReady = true;
+                opponentPlacementTime = otherTime;
+                opponentPlacementTimeReceived = true;
+                readyStateStartTime = now;
+            } else if (msg.startsWith("READY")) {
+                // Backwards-compatible: treat plain READY as timestamp 0
+                Serial.println("[READY] Received opponent READY (no timestamp)");
+                opponentReady = true;
+                opponentPlacementTime = 0;
+                opponentPlacementTimeReceived = true;
+                readyStateStartTime = now;
+            } else {
+                // Not a READY message — defer for the main game loop to process
+                Serial.print("[READY] Deferring non-READY message during handshake: ");
+                Serial.println(msg);
+                pendingMessage = msg;
+            }
         }
     }
 
@@ -76,6 +85,8 @@ inline void handleReadyHandshake() {
         // Game has started
         if (!opponentReady && (now - readyStateStartTime) > 5000) {
             Serial.println("[READY] WARNING: Opponent became unready during game");
+            // Avoid spamming the log: only warn once per interval
+            readyStateStartTime = now;
         }
     }
 }

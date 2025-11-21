@@ -24,76 +24,91 @@ inline void placementStep(int dx, int dy, int button, CRGB frame[16][16], bool &
 // ===== Main Aiming Loop =====
 
 inline void aim(int dx, int dy, int button, CRGB frame[16][16]) {
-    // Process incoming messages
-    String msg = receiveMessage();
-    if (msg.length() > 0) {
-        Serial.print("[AIM] Received message: ");
-        Serial.println(msg);
+    // Process all pending or incoming messages in a loop to handle
+    // multiple deferred messages (e.g., rapid AIM packets + SHOT + RESULT)
+    bool processedAny = false;
+    
+    for (int msgAttempt = 0; msgAttempt < 10; msgAttempt++) {  // Safety: max 10 messages per loop
+        String msg = "";
+        if (pendingMessage.length() > 0) {
+            msg = pendingMessage;
+            pendingMessage = "";
+            processedAny = true;
+        } else {
+            msg = receiveMessage();
+            if (msg.length() == 0) break;  // No more messages
+            processedAny = true;
+        }
+        
+        if (msg.length() > 0) {
+            Serial.print("[AIM] Received message: ");
+            Serial.println(msg);
 
-        if (msg.startsWith("AIM:")) {
-            int comma = msg.indexOf(',');
-            if (comma > 4) {
-                int x = msg.substring(4, comma).toInt();
-                int y = msg.substring(comma + 1).toInt();
-                if (isAimWithinBounds(x, y)) {
-                    Serial.print("[AIM] Opponent aiming at: ");
-                    Serial.print(x);
+            if (msg.startsWith("AIM:")) {
+                int comma = msg.indexOf(',');
+                if (comma > 4) {
+                    int x = msg.substring(4, comma).toInt();
+                    int y = msg.substring(comma + 1).toInt();
+                    if (isAimWithinBounds(x, y)) {
+                        Serial.print("[AIM] Opponent aiming at: ");
+                        Serial.print(x);
+                        Serial.print(",");
+                        Serial.println(y);
+                        oppAimX = x;
+                        oppAimY = y;
+                        oppAimTime = millis();
+                    }
+                }
+            }
+            else if (msg.startsWith("SHOT:")) {
+                int comma = msg.indexOf(',');
+                if (comma > 5) {
+                    int sx = msg.substring(5, comma).toInt();
+                    int sy = msg.substring(comma + 1).toInt();
+                    Serial.print("[AIM] Opponent shot at: ");
+                    Serial.print(sx);
                     Serial.print(",");
-                    Serial.println(y);
-                    oppAimX = x;
-                    oppAimY = y;
-                    oppAimTime = millis();
+                    Serial.println(sy);
+
+                    if (isAimWithinBounds(sx, sy)) {
+                        bool wasHit = occupied[sx][sy];
+                        Serial.print("[AIM] Shot result: ");
+                        Serial.println(wasHit ? "HIT" : "MISS");
+
+                        if (wasHit) hitMap[sx][sy] = true;
+                        int boatIdx = boatIndexAt(sx, sy);
+                        bool sunk = (boatIdx >= 0) && boatSunk(boatIdx);
+                        char reply[32];
+                        if (wasHit) snprintf(reply, sizeof(reply), "RESULT:%s", sunk ? "SINK" : "HIT");
+                        else snprintf(reply, sizeof(reply), "RESULT:MISS");
+                        
+                        Serial.println("[AIM] >>> Transitioning to PHASE_OPPONENT_SHOT (local)");
+                        gamePhase = PHASE_OPPONENT_SHOT;
+                        phaseStartTime = millis();
+                        
+                        Serial.print("[AIM] Sending reply: ");
+                        Serial.println(reply);
+                        sendMessage(reply);
+                    }
                 }
             }
-        }
-        else if (msg.startsWith("SHOT:")) {
-            int comma = msg.indexOf(',');
-            if (comma > 5) {
-                int sx = msg.substring(5, comma).toInt();
-                int sy = msg.substring(comma + 1).toInt();
-                Serial.print("[AIM] Opponent shot at: ");
-                Serial.print(sx);
-                Serial.print(",");
-                Serial.println(sy);
+            else if (msg.startsWith("RESULT:")) {
+                String result = msg.substring(7);
+                Serial.print("[AIM] Received result: ");
+                Serial.println(result);
 
-                if (isAimWithinBounds(sx, sy)) {
-                    bool wasHit = occupied[sx][sy];
-                    Serial.print("[AIM] Shot result: ");
-                    Serial.println(wasHit ? "HIT" : "MISS");
-
-                    if (wasHit) hitMap[sx][sy] = true;
-                    int boatIdx = boatIndexAt(sx, sy);
-                    bool sunk = (boatIdx >= 0) && boatSunk(boatIdx);
-                    char reply[32];
-                    if (wasHit) snprintf(reply, sizeof(reply), "RESULT:%s", sunk ? "SINK" : "HIT");
-                    else snprintf(reply, sizeof(reply), "RESULT:MISS");
-                    
-                    Serial.println("[AIM] >>> Transitioning to PHASE_OPPONENT_SHOT (local)");
-                    gamePhase = PHASE_OPPONENT_SHOT;
-                    phaseStartTime = millis();
-                    
-                    Serial.print("[AIM] Sending reply: ");
-                    Serial.println(reply);
-                    sendMessage(reply);
+                if (aimX >= 0 && aimY >= 0) {
+                    if (result.startsWith("HIT")) opponentMap[aimX][aimY] = 2;
+                    else if (result.startsWith("MISS")) opponentMap[aimX][aimY] = 1;
+                    else if (result.startsWith("SINK")) {
+                        opponentMap[aimX][aimY] = 2;
+                        markSunkOpponentBoat(aimX, aimY);
+                    }
                 }
+                Serial.println("[AIM] >>> Transitioning to PHASE_SHOW_RESULT");
+                gamePhase = PHASE_SHOW_RESULT;
+                phaseStartTime = millis();
             }
-        }
-        else if (msg.startsWith("RESULT:")) {
-            String result = msg.substring(7);
-            Serial.print("[AIM] Received result: ");
-            Serial.println(result);
-
-            if (aimX >= 0 && aimY >= 0) {
-                if (result.startsWith("HIT")) opponentMap[aimX][aimY] = 2;
-                else if (result.startsWith("MISS")) opponentMap[aimX][aimY] = 1;
-                else if (result.startsWith("SINK")) {
-                    opponentMap[aimX][aimY] = 2;
-                    markSunkOpponentBoat(aimX, aimY);
-                }
-            }
-            Serial.println("[AIM] >>> Transitioning to PHASE_SHOW_RESULT");
-            gamePhase = PHASE_SHOW_RESULT;
-            phaseStartTime = millis();
         }
     }
 

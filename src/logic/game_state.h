@@ -37,7 +37,9 @@ enum GamePhase {
     PHASE_MY_TURN,
     PHASE_OPPONENT_SHOT,
     PHASE_SHOW_RESULT,
-    PHASE_WAIT_FOR_OPPONENT
+    PHASE_WAIT_FOR_OPPONENT,
+    PHASE_GAME_WON,
+    PHASE_GAME_LOST
 };
 
 // ===== Ready State Enum =====
@@ -75,3 +77,11 @@ static bool opponentReady = false;
 static unsigned long readyStateStartTime = 0;
 static unsigned long opponentPlacementTime = 0;
 static bool opponentPlacementTimeReceived = false;
+// Temporary buffer for a received non-READY message that was consumed
+// during the ready handshake. This ensures we don't lose important
+// game messages (SHOT/AIM/RESULT) if they arrive while processing READY.
+static String pendingMessage = "";
+
+// ===== Win/Loss Tracking =====
+static bool gameEnded = false;
+static bool playerWon = false;

@@ -6,7 +6,6 @@
 #include "joystick.h"
 #include "led_matrix.h"
 #include "game_logic.h"
-#include "player_logic.h"
 #include "credentials.h"
 
 // UDP object (left in main so network helpers keep working)
@@ -64,9 +63,8 @@ void loop() {
         // Game phase: handle ready handshake and then gameplay
         handleReadyHandshake();
         
-        // Only allow aim/shooting if both players are synced
         if (readyState == READY_SYNCED) {
-            // Both players ready - run normal gameplay
+            // Both players ready - run normal gameplay (aim processes all messages)
             aim(xInput, yInput, button, frame);
         } else {
             // Still waiting for opponent to finish placement - show waiting screen
