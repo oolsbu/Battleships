@@ -2,6 +2,7 @@
 #define UDP_COMMUNICATION_H
 
 #include <WiFiUdp.h>
+#include <string.h>
 #include "config.h"
 
 // Create a UDP object in the implementation translation unit

@@ -7,6 +7,7 @@
 #include "led_matrix.h"
 #include "game_logic.h"
 #include "credentials.h"
+#include "animations.h"
 
 // UDP object (left in main so network helpers keep working)
 WiFiUDP udp;
@@ -30,10 +31,31 @@ void setup() {
     const char* ssid = WIFI_SSID;
     const char* password = WIFI_PASSWORD;
     
-    if (!connectWiFi(ssid, password, 20000)) {
-        Serial.println("Failed to connect to WiFi - continuing without network");
-    } else {
+    // Start a small wifi animation while attempting to connect
+    animationsInit();
+    startAnimation(ANIM_WIFI, 150);
+
+    bool wifiOk = connectWiFi(ssid, password, 20000);
+
+    // Stop the running animation; we'll show a final state
+    stopAnimation();
+
+    if (wifiOk) {
+        // Show the full connected symbol (last frame) for 2 seconds
+        showAnimationFrame(ANIM_WIFI, 3);
+        delay(2000);
+        clearAnimationDisplay();
         startUDP(LOCAL_PORT);
+    } else {
+        Serial.println("Failed to connect to WiFi - continuing without network");
+        // Blink the low-connection symbol (first frame) for 2 seconds
+        unsigned long t0 = millis();
+        while (millis() - t0 < 2000) {
+            showAnimationFrame(ANIM_WIFI, 0);
+            delay(300);
+            clearAnimationDisplay();
+            delay(300);
+        }
     }
 }
 
