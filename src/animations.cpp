@@ -11,12 +11,8 @@ static uint32_t g_frameDelay = 200;
 static uint32_t g_lastMillis = 0;
 static int g_currentFrame = 0;
 
-// Frame buffer arranged as frame[x][y] to match showFrame expectations
 static CRGB g_frameBuf[WIDTH][HEIGHT];
 
-void animationsInit() {
-  // nothing for now, but keep hook if needed
-}
 
 static void drawWifiFrame(int frameIndex) {
   if (frameIndex < 0) return;
@@ -26,8 +22,7 @@ static void drawWifiFrame(int frameIndex) {
       int idx = y * WIDTH + x;
       uint32_t px = frame[idx];
       CRGB c;
-      // Piskel exported pixels are either 0x00000000 (transparent) or 0xff000000
-      // Treat any non-zero entry as white for this simple monochrome animation.
+      
       if (px == 0) {
         c = CRGB::Black;
       } else {
