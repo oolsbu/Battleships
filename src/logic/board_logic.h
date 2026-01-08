@@ -12,7 +12,6 @@ inline bool boatFitsInBounds(const Boat &b) {
 }
 
 inline bool boatCollidesWithPlaced(const Boat &b) {
-    // Check if boat collides with any already-placed boats
     if (!boatFitsInBounds(b)) return true;
     if (!b.vertical) {
         for (int i = 0; i < b.size; i++)
@@ -25,7 +24,6 @@ inline bool boatCollidesWithPlaced(const Boat &b) {
 }
 
 inline int boatIndexAt(int x, int y) {
-    // Find which boat (if any) is at board position (x, y)
     for (int i = 0; i < boatsCount; i++) {
         Boat &b = boats[i];
         if (!b.placed) continue;
@@ -39,7 +37,6 @@ inline int boatIndexAt(int x, int y) {
 }
 
 inline bool boatSunk(int index) {
-    // Check if a specific boat has been fully sunk
     if (index < 0 || index >= boatsCount) return false;
     Boat &b = boats[index];
     if (!b.placed) return false;
@@ -54,7 +51,6 @@ inline bool boatSunk(int index) {
 }
 
 inline void markSunkOpponentBoat(int x, int y) {
-    // Mark opponent boat as fully sunk; spread the mark across the entire boat
     if (x < 0 || y < 0 || x >= BOARD_SIZE || y >= BOARD_SIZE) return;
     opponentMap[x][y] = 3;
     int lx = x, rx = x;
@@ -72,15 +68,13 @@ inline void markSunkOpponentBoat(int x, int y) {
     }
 }
 
-// ===== Aiming Bounds =====
+// ===== Aiming =====
 
 inline bool isAimWithinBounds(int x, int y) {
-    // Check if aim position is within the play board
     return (x >= 0 && x < BOARD_SIZE && y >= 0 && y < BOARD_SIZE);
 }
 
 inline void clampAim(int &x, int &y) {
-    // Clamp aim to board bounds
     if (x < 0) x = 0;
     if (x >= BOARD_SIZE) x = BOARD_SIZE - 1;
     if (y < 0) y = 0;
@@ -88,11 +82,7 @@ inline void clampAim(int &x, int &y) {
 }
 
 inline bool allOpponentBoatsSunk() {
-    // Check if all of the opponent's boats are sunk.
-    // Count cells marked as sunk (value 3) and compare to total boat cells.
-    // Total calculated dynamically from config: sum of (size[i] * count[i])
-    
-    // Calculate total boat cells from config
+
     int totalBoatCells = 0;
     for (int i = 0; i < types; i++) {
         totalBoatCells += sizes[i] * counts[i];
@@ -111,12 +101,10 @@ inline bool allOpponentBoatsSunk() {
 }
 
 inline bool allyBoatsAllSunk() {
-    // Check if all of our boats have been sunk (all cells in boats are in hitMap)
     for (int i = 0; i < boatsCount; i++) {
         if (!boats[i].placed) continue;
         if (!boatSunk(i)) return false;
     }
-    // Verify we have at least one placed boat
     bool hasBoats = false;
     for (int i = 0; i < boatsCount; i++) {
         if (boats[i].placed) {
@@ -128,6 +116,5 @@ inline bool allyBoatsAllSunk() {
 }
 
 inline bool shotAlreadyFired(int x, int y) {
-    // Check if this square has already been shot at (opponentMap is not 0)
     return (opponentMap[x][y] != 0);
 }

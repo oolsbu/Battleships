@@ -67,7 +67,6 @@ inline void drawPlacementFrame(CRGB frame[16][16]) {
     
     drawBorder(frame);
     
-    // Draw placed boats
     for (int i = 0; i < boatsCount; i++) {
         if (!boats[i].placed) continue;
         Boat &b = boats[i];
@@ -86,7 +85,6 @@ inline void drawPlacementFrame(CRGB frame[16][16]) {
         }
     }
     
-    // Draw current boat being placed
     if (currentIndex < boatsCount) {
         Boat &cb = boats[currentIndex];
         CRGB color = (boatCollidesWithPlaced(cb) || !boatFitsInBounds(cb)) ? COLOR_INVALID : COLOR_PLACING;
@@ -109,12 +107,11 @@ inline void drawPlacementFrame(CRGB frame[16][16]) {
 // ===== Game Phase Displays =====
 
 inline void drawMyTurnFrame(CRGB frame[16][16]) {
-    // Show opponent's board with aiming cursor (YOUR TURN - use yellow/gold border)
     for (int y = 0; y < 16; y++)
         for (int x = 0; x < 16; x++)
             frame[x][y] = CRGB::Black;
     
-    drawBorderWithColor(frame, CRGB::Yellow);  // Yellow border for your turn
+    drawBorderWithColor(frame, CRGB::Yellow);
     
     // Draw opponent map (misses and hits)
     for (int y = 0; y < BOARD_SIZE; y++) {
@@ -132,12 +129,11 @@ inline void drawMyTurnFrame(CRGB frame[16][16]) {
 }
 
 inline void drawOpponentShotFrame(CRGB frame[16][16]) {
-    // Show your board with hits (OPPONENT'S TURN - use cyan/light blue border)
     for (int y = 0; y < 16; y++)
         for (int x = 0; x < 16; x++)
             frame[x][y] = CRGB::Black;
     
-    drawBorderWithColor(frame, CRGB::Cyan);  // Cyan border for opponent's turn
+    drawBorderWithColor(frame, CRGB::Cyan);
     
     for (int y = 0; y < BOARD_SIZE; y++) {
         for (int x = 0; x < BOARD_SIZE; x++) {
@@ -152,12 +148,11 @@ inline void drawOpponentShotFrame(CRGB frame[16][16]) {
 }
 
 inline void drawShowResultFrame(CRGB frame[16][16]) {
-    // Show opponent's board with result highlighted (transitional - use white border)
     for (int y = 0; y < 16; y++)
         for (int x = 0; x < 16; x++)
             frame[x][y] = CRGB::Black;
     
-    drawBorderWithColor(frame, CRGB::White);  // White border for result display
+    drawBorderWithColor(frame, CRGB::White);
     
     for (int y = 0; y < BOARD_SIZE; y++) {
         for (int x = 0; x < BOARD_SIZE; x++) {
@@ -171,19 +166,15 @@ inline void drawShowResultFrame(CRGB frame[16][16]) {
 }
 
 inline void drawWaitForOpponentFrame(CRGB frame[16][16]) {
-    // Determine which board to show:
-    // - If we just fired, show opponent's board (waiting for result) - use cyan
-    // - If opponent is firing at us, show our board (showing their shot) - use cyan
-    bool showingOwnBoard = (lastShotX < 0 || lastShotY < 0);  // Show own board only if we haven't just fired
+    bool showingOwnBoard = (lastShotX < 0 || lastShotY < 0);
     
     for (int y = 0; y < 16; y++)
         for (int x = 0; x < 16; x++)
             frame[x][y] = CRGB::Black;
     
-    drawBorderWithColor(frame, CRGB::Cyan);  // Cyan border when waiting (opponent's turn)
+    drawBorderWithColor(frame, CRGB::Cyan);
     
     if (showingOwnBoard) {
-        // Show your board with all boats visible (opponent is shooting)
         for (int i = 0; i < boatsCount; i++) {
             if (!boats[i].placed) continue;
             Boat &b = boats[i];
@@ -191,7 +182,7 @@ inline void drawWaitForOpponentFrame(CRGB frame[16][16]) {
                 for (int cell = 0; cell < b.size; cell++) {
                     int px = BOARD_OFFSET_X + b.x + cell;
                     int py = BOARD_OFFSET_Y + b.y;
-                    // Show red if hit, green if unhit
+
                     if (hitMap[b.x + cell][b.y]) {
                         int boatIdx = boatIndexAt(b.x + cell, b.y);
                         frame[px][py] = (boatIdx >= 0 && boatSunk(boatIdx)) ? COLOR_SUNK : COLOR_HIT;
@@ -213,17 +204,14 @@ inline void drawWaitForOpponentFrame(CRGB frame[16][16]) {
             }
         }
         
-        // Show opponent's aiming cursor if enabled
 #if SHOW_OPPONENT_AIM
         if (oppAimX >= 0 && oppAimY >= 0 && (millis() - oppAimTime) < OPP_AIM_TIMEOUT_MS) {
             frame[BOARD_OFFSET_X + oppAimX][BOARD_OFFSET_Y + oppAimY] = COLOR_AIM;
         }
 #endif
         
-        // Indicator in corner
         frame[0][0] = COLOR_WAITING;
     } else {
-        // Show opponent's board (we just fired, waiting for result)
         for (int y = 0; y < BOARD_SIZE; y++) {
             for (int x = 0; x < BOARD_SIZE; x++) {
                 int px = BOARD_OFFSET_X + x;
@@ -234,25 +222,22 @@ inline void drawWaitForOpponentFrame(CRGB frame[16][16]) {
             }
         }
         
-        // Pulse the last shot location to indicate it's pending
         unsigned long flashCycle = (millis() / 300) % 2;
         if (flashCycle == 0 && lastShotX >= 0 && lastShotY >= 0) {
             int px = BOARD_OFFSET_X + lastShotX;
             int py = BOARD_OFFSET_Y + lastShotY;
-            frame[px][py] = CRGB::White;  // Bright pulse on pending shot
+            frame[px][py] = CRGB::White;
         }
     }
 }
 
 inline void drawGameWonFrame(CRGB frame[16][16]) {
-    // Show opponent's board with a victory animation (all sunk marked)
     for (int y = 0; y < 16; y++)
         for (int x = 0; x < 16; x++)
             frame[x][y] = CRGB::Black;
     
     drawBorder(frame);
     
-    // Draw all opponent squares (misses blue, hits/sinks purple)
     for (int y = 0; y < BOARD_SIZE; y++) {
         for (int x = 0; x < BOARD_SIZE; x++) {
             int px = BOARD_OFFSET_X + x;
@@ -262,7 +247,6 @@ inline void drawGameWonFrame(CRGB frame[16][16]) {
         }
     }
     
-    // Flash entire frame with green to indicate victory
     unsigned long flashCycle = (millis() / 500) % 2;
     if (flashCycle == 0) {
         fillFrameBorderWithColor(frame, CRGB::Green);
@@ -270,15 +254,12 @@ inline void drawGameWonFrame(CRGB frame[16][16]) {
 }
 
 inline void drawGameLostFrame(CRGB frame[16][16]) {
-    // Show your board showing all hits/sinks with a loss state (red border and flash)
     for (int y = 0; y < 16; y++)
         for (int x = 0; x < 16; x++)
             frame[x][y] = CRGB::Black;
     
-    // Draw red border to indicate loss
     drawBorderWithColor(frame, CRGB::Red);
     
-    // Draw all placed boats
     for (int i = 0; i < boatsCount; i++) {
         if (!boats[i].placed) continue;
         Boat &b = boats[i];
@@ -307,7 +288,6 @@ inline void drawGameLostFrame(CRGB frame[16][16]) {
         }
     }
     
-    // Flash entire frame with red to indicate loss
     unsigned long flashCycle = (millis() / 500) % 2;
     if (flashCycle == 0) {
         fillFrameBorderWithColor(frame, CRGB::Red);

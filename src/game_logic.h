@@ -24,11 +24,9 @@ inline void placementStep(int dx, int dy, int button, CRGB frame[16][16], bool &
 // ===== Main Aiming Loop =====
 
 inline void aim(int dx, int dy, int button, CRGB frame[16][16]) {
-    // Process all pending or incoming messages in a loop to handle
-    // multiple deferred messages (e.g., rapid AIM packets + SHOT + RESULT)
     bool processedAny = false;
     
-    for (int msgAttempt = 0; msgAttempt < 10; msgAttempt++) {  // Safety: max 10 messages per loop
+    for (int msgAttempt = 0; msgAttempt < 10; msgAttempt++) {
         String msg = "";
         if (pendingMessage.length() > 0) {
             msg = pendingMessage;
@@ -36,7 +34,7 @@ inline void aim(int dx, int dy, int button, CRGB frame[16][16]) {
             processedAny = true;
         } else {
             msg = receiveMessage();
-            if (msg.length() == 0) break;  // No more messages
+            if (msg.length() == 0) break;
             processedAny = true;
         }
         
@@ -44,19 +42,16 @@ inline void aim(int dx, int dy, int button, CRGB frame[16][16]) {
             Serial.print("[AIM] Received message: ");
             Serial.println(msg);
             
-            // Ignore stale READY messages during gameplay (game already synced)
             if (msg.startsWith("READY:") || msg.startsWith("READY")) {
                 Serial.println("[AIM] Ignoring stale READY message during gameplay");
                 continue;
             }
             
-            // Handle LOST message from opponent
             if (msg.startsWith("LOST")) {
                 Serial.println("[GAME] Opponent sent LOST message - they acknowledge our victory");
                 continue;
             }
             
-            // Any valid game message is a heartbeat indicating opponent is present
             opponentReady = true;
 
             if (msg.startsWith("AIM:")) {
@@ -120,7 +115,6 @@ inline void aim(int dx, int dy, int button, CRGB frame[16][16]) {
                         markSunkOpponentBoat(aimX, aimY);
                     }
                 }
-                // Clear the last shot marker so we'll show our board after result display
                 lastShotX = -1;
                 lastShotY = -1;
                 Serial.println("[AIM] >>> Transitioning to PHASE_SHOW_RESULT");
@@ -130,10 +124,8 @@ inline void aim(int dx, int dy, int button, CRGB frame[16][16]) {
         }
     }
 
-    // Update phase transitions
     updatePhaseTransitions();
 
-    // Check for game-end conditions
     if (!gameEnded) {
         if (allOpponentBoatsSunk()) {
             Serial.println("[GAME] >>> YOU WIN! All opponent boats sunk!");
@@ -141,7 +133,6 @@ inline void aim(int dx, int dy, int button, CRGB frame[16][16]) {
             playerWon = true;
             gamePhase = PHASE_GAME_WON;
             phaseStartTime = millis();
-            // Notify opponent they lost
             sendMessage("LOST");
         } else if (allyBoatsAllSunk()) {
             Serial.println("[GAME] >>> YOU LOSE! All your boats have been sunk!");
@@ -152,9 +143,7 @@ inline void aim(int dx, int dy, int button, CRGB frame[16][16]) {
         }
     }
 
-    // Handle aiming input and drawing
     if (gamePhase == PHASE_MY_TURN) {
-        // Player can move cursor and aim
         bool moved = false;
         if (dx != 0 || dy != 0) {
             aimX += dx;
@@ -173,7 +162,6 @@ inline void aim(int dx, int dy, int button, CRGB frame[16][16]) {
 #endif
         
         if (button == 1) {
-            // Check if this square has already been shot
             if (shotAlreadyFired(aimX, aimY)) {
                 Serial.println("[SHOOT] Square already shot! Ignoring duplicate shot.");
             } else {
@@ -182,9 +170,7 @@ inline void aim(int dx, int dy, int button, CRGB frame[16][16]) {
                 Serial.print("[SHOOT] FIRING at ");
                 Serial.println(shotMsg);
                 sendMessage(shotMsg);
-                // Mark as pending (set to 1 = MISS by default, will be updated by result)
                 opponentMap[aimX][aimY] = 1;
-                // Track this shot so we keep showing opponent board while waiting for result
                 lastShotX = aimX;
                 lastShotY = aimY;
                 Serial.println("[SHOOT] >>> Transitioning to PHASE_WAIT_FOR_OPPONENT");

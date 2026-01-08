@@ -8,7 +8,6 @@ inline bool beginPlacement(const uint8_t sizes[], const uint8_t counts[], int ty
     boatsCount = 0;
     currentIndex = 0;
     
-    // Clear boards
     for (int y = 0; y < BOARD_SIZE; y++)
         for (int x = 0; x < BOARD_SIZE; x++)
             occupied[x][y] = false;
@@ -17,7 +16,6 @@ inline bool beginPlacement(const uint8_t sizes[], const uint8_t counts[], int ty
         for (int x = 0; x < BOARD_SIZE; x++)
             hitMap[x][y] = false, opponentMap[x][y] = 0;
     
-    // Create boats from config
     for (int t = 0; t < types; t++) {
         for (int c = 0; c < counts[t]; c++) {
             if (boatsCount >= MAX_BOATS) return false;
@@ -30,7 +28,6 @@ inline bool beginPlacement(const uint8_t sizes[], const uint8_t counts[], int ty
         }
     }
     
-    // Position first boat at center
     if (boatsCount > 0) {
         boats[0].x = max(0, (BOARD_SIZE - boats[0].size) / 2);
         boats[0].y = BOARD_SIZE / 2;
@@ -46,7 +43,6 @@ inline void moveCurrentBoat(int dx, int dy, int button) {
     b.x += dx;
     b.y += dy;
     
-    // Clamp position to board
     if (!b.vertical) {
         if (b.x < 0) b.x = 0;
         if (b.y < 0) b.y = 0;
@@ -65,7 +61,6 @@ inline void rotateCurrentBoat() {
     Boat &b = boats[currentIndex];
     b.vertical = !b.vertical;
     
-    // Clamp after rotation
     if (!b.vertical) {
         if (b.x + b.size > BOARD_SIZE) b.x = BOARD_SIZE - b.size;
         if (b.y >= BOARD_SIZE) b.y = BOARD_SIZE - 1;
@@ -81,10 +76,8 @@ inline void confirmPlacement(bool &finished) {
     if (currentIndex >= boatsCount) return;
     Boat &b = boats[currentIndex];
     
-    // Check for collisions before confirming
     if (boatCollidesWithPlaced(b)) return;
     
-    // Mark cells as occupied
     if (!b.vertical) {
         for (int i = 0; i < b.size; i++) occupied[b.x + i][b.y] = true;
     } else {

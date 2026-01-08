@@ -7,7 +7,6 @@
 #define NEW_PISKEL_FRAME_WIDTH 16
 #define NEW_PISKEL_FRAME_HEIGHT 16
 
-/* Piskel data for "New Piskel" (wifi animation) */
 
 static const uint32_t wifi_piskel_data[NEW_PISKEL_FRAME_COUNT][NEW_PISKEL_FRAME_WIDTH * NEW_PISKEL_FRAME_HEIGHT] = {
 {
@@ -45,4 +44,4 @@ static const uint32_t wifi_piskel_data[NEW_PISKEL_FRAME_COUNT][NEW_PISKEL_FRAME_
 }
 };
 
-#endif // PISKEL_H
+#endif

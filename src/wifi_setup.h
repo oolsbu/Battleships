@@ -4,8 +4,6 @@
 #include <WiFiNINA.h>
 #include "animations.h"
 
-// Connect to WiFi and wait up to timeoutMs for connection.
-// Returns true if connected, false on timeout.
 inline bool connectWiFi(const char* ssid, const char* password, unsigned long timeoutMs = 15000) {
   Serial.print("Connecting to WiFi: ");
   if(ssid == nullptr || strlen(ssid) == 0) {
@@ -22,7 +20,6 @@ inline bool connectWiFi(const char* ssid, const char* password, unsigned long ti
       return false;
     }
     Serial.print('.');
-    // Let animations update while waiting for connection
     animationsUpdate();
     delay(200);
   }

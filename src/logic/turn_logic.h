@@ -5,16 +5,12 @@
 // ===== Ready Handshake Management =====
 
 inline void handleReadyHandshake() {
-    // Handle the ready state machine for synchronizing game start
-    // Only process messages if we haven't synced yet; once READY_SYNCED,
-    // all incoming messages should go directly to the game loop (aim function).
     unsigned long now = millis();
     
     if (readyState != READY_SYNCED) {
         String msg = receiveMessage();
         if (msg.length() > 0) {
             if (msg.startsWith("READY:")) {
-                // Expect format: READY:<placementMillis>
                 unsigned long otherTime = (unsigned long) msg.substring(6).toInt();
                 Serial.print("[READY] Received opponent READY timestamp: ");
                 Serial.println(otherTime);
@@ -23,14 +19,12 @@ inline void handleReadyHandshake() {
                 opponentPlacementTimeReceived = true;
                 readyStateStartTime = now;
             } else if (msg.startsWith("READY")) {
-                // Backwards-compatible: treat plain READY as timestamp 0
                 Serial.println("[READY] Received opponent READY (no timestamp)");
                 opponentReady = true;
                 opponentPlacementTime = 0;
                 opponentPlacementTimeReceived = true;
                 readyStateStartTime = now;
             } else {
-                // Not a READY message — defer for the main game loop to process
                 Serial.print("[READY] Deferring non-READY message during handshake: ");
                 Serial.println(msg);
                 pendingMessage = msg;
@@ -39,12 +33,9 @@ inline void handleReadyHandshake() {
     }
 
     if (readyState == READY_PLACEMENT) {
-        // Still placing boats locally; nothing to do
         return;
     } else if (readyState == READY_WAITING_FOR_OPPONENT) {
-        // We're done placing, waiting for opponent
         if (opponentPlacementTimeReceived) {
-            // Both sides have placement timestamps; determine who shoots first
             Serial.println("[READY] Both timestamps available - deciding who shoots first...");
             const unsigned long MAX_UL = 0xFFFFFFFFUL;
             unsigned long myTime = placementFinishedTime ? placementFinishedTime : MAX_UL;
@@ -53,13 +44,11 @@ inline void handleReadyHandshake() {
             Serial.print(" theirTime="); Serial.println(theirTime);
             
 #if RANDOM_FIRST_SHOOTER
-            // Random selection: use timestamp as seed
             randomSeed(myTime ^ theirTime);
             bool iShootFirst = (random(0, 2) == 0);
             Serial.print("[READY] Random selection: ");
             Serial.println(iShootFirst ? "YOU SHOOT FIRST" : "OPPONENT SHOOTS FIRST");
 #else
-            // Deterministic: who finished placement first shoots first
             bool iShootFirst = (myTime <= theirTime);
             Serial.print("[READY] Deterministic selection (timestamp-based): ");
             Serial.println(iShootFirst ? "YOU FINISHED FIRST - YOU SHOOT FIRST" : "OPPONENT FINISHED FIRST - YOU WAIT FIRST");
@@ -75,20 +64,16 @@ inline void handleReadyHandshake() {
             readyState = READY_SYNCED;
             readyStateStartTime = now;
         } else if ((now - placementFinishedTime) > READY_HANDSHAKE_TIMEOUT_MS) {
-            // Timeout - assume opponent is down
             Serial.println("[READY] Opponent timeout! Starting anyway... you shoot first");
             readyState = READY_SYNCED;
             readyStateStartTime = now;
             gamePhase = PHASE_MY_TURN;
         }
     } else if (readyState == READY_SYNCED) {
-        // Game has started - no action needed here
-        // Opponent presence is tracked by receiving game messages (heartbeat mechanism)
     }
 }
 
 inline void notifyReadyToOpponent() {
-    // Called when this player finishes placement
     Serial.println("[READY] Notifying opponent that placement is complete (with timestamp)...");
     placementFinishedTime = millis();
     char buf[32];

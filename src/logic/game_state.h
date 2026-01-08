@@ -22,12 +22,12 @@ static const unsigned long LONG_PRESS_MS = 500;
 static const unsigned long AIM_SEND_INTERVAL_MS = 150;
 static const unsigned long OPP_AIM_TIMEOUT_MS = 1500;
 static const unsigned long READY_HANDSHAKE_TIMEOUT_MS = 10000;
-static const unsigned long RESULT_DISPLAY_TIME_MS = 2000;  // Increased from 1000 to smooth transitions
+static const unsigned long RESULT_DISPLAY_TIME_MS = 2000;
 
 // ===== Boat Structure =====
 struct Boat {
     uint8_t size;
-    int x, y;           // Coordinates within the play board
+    int x, y;
     bool vertical;
     bool placed;
 };
@@ -65,7 +65,7 @@ static int aimY = BOARD_SIZE / 2;
 static unsigned long lastAimSendTime = 0;
 static int oppAimX = -1, oppAimY = -1;
 static unsigned long oppAimTime = 0;
-static int lastShotX = -1, lastShotY = -1;  // Track the last shot fired to show opponent board after firing
+static int lastShotX = -1, lastShotY = -1;
 
 // ===== Phase Management =====
 static GamePhase gamePhase = PHASE_MY_TURN;
@@ -78,9 +78,6 @@ static bool opponentReady = false;
 static unsigned long readyStateStartTime = 0;
 static unsigned long opponentPlacementTime = 0;
 static bool opponentPlacementTimeReceived = false;
-// Temporary buffer for a received non-READY message that was consumed
-// during the ready handshake. This ensures we don't lose important
-// game messages (SHOT/AIM/RESULT) if they arrive while processing READY.
 static String pendingMessage = "";
 
 // ===== Win/Loss Tracking =====
